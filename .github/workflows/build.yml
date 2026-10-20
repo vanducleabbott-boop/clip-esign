@@ -1,0 +1,41 @@
+name: Build Clip IPA (cho ESign)
+# Lấy mã nguồn gốc rileytestut/Clip (Unlicense) + submodule Roxas, build KHÔNG ký, đóng IPA để ESign ký lại.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Lấy mã nguồn Clip
+        uses: actions/checkout@v4
+        with:
+          repository: rileytestut/Clip
+          submodules: recursive
+
+      - name: Build (không ký)
+        run: |
+          set -o pipefail
+          xcodebuild -project Clip.xcodeproj -scheme Clip -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tail -n 80
+
+      - name: Đóng gói IPA
+        run: |
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -n 1)
+          echo "App: $APP"
+          ls "$APP/PlugIns" 2>/dev/null || true
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry Clip.ipa Payload
+          ls -la Clip.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Clip-ipa
+          path: Clip.ipa
+          retention-days: 3
