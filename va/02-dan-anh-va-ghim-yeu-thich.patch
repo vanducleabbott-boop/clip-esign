@@ -40,7 +40,7 @@ index a8d80c6..7402f04 100644
 +
  }
 diff --git a/ClipKit/Database/Model/PasteboardItem.swift b/ClipKit/Database/Model/PasteboardItem.swift
-index b9c00b9..bad6a58 100644
+index b9c00b9..b09de53 100644
 --- a/ClipKit/Database/Model/PasteboardItem.swift
 +++ b/ClipKit/Database/Model/PasteboardItem.swift
 @@ -128,3 +128,35 @@ extension PasteboardItem
@@ -55,7 +55,7 @@ index b9c00b9..bad6a58 100644
 +        if let string = self.preferredRepresentation?.stringValue {
 +            return "text:" + string
 +        }
-+        if let data = self.preferredRepresentation?.data {
++        if let data = self.preferredRepresentation?.dataValue {
 +            return "data:\(data.count):\(self.date.timeIntervalSinceReferenceDate)"
 +        }
 +        return self.objectID.uriRepresentation().absoluteString
