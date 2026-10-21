@@ -34,7 +34,7 @@ jobs:
         working-directory: clip
         run: |
           set -o pipefail
-          read VER BUILD < ../rieng/PHIEN_BAN
+          read VER BUILD < ../rieng/PHIEN_BAN || true
           echo "Phiên bản $VER ($BUILD)"
           echo "VER=$VER" >> "$GITHUB_ENV"
           xcodebuild -project Clip.xcodeproj -scheme Clip -configuration Release \
