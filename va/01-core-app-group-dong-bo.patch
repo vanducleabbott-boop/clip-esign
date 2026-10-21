@@ -1,3 +1,20 @@
+diff --git a/Clip/Pasteboard/PasteboardMonitor.swift b/Clip/Pasteboard/PasteboardMonitor.swift
+index 660944e..35cc09c 100644
+--- a/Clip/Pasteboard/PasteboardMonitor.swift
++++ b/Clip/Pasteboard/PasteboardMonitor.swift
+@@ -88,8 +88,10 @@ private extension PasteboardMonitor
+             
+             let content = UNMutableNotificationContent()
+             content.categoryIdentifier = UNNotificationCategory.clipboardReaderIdentifier
+-            content.title = NSLocalizedString("Clipboard Changed", comment: "")
+-            content.body = NSLocalizedString("Swipe down to save to Clip.", comment: "")
++            // ESign không có App Group: kéo thông báo xuống sẽ lưu vào kho riêng của phần mở rộng (app không thấy)
++            // -> hướng dẫn CHẠM để mở Clip, Clip tự lưu clipboard khi mở (sceneWillEnterForeground).
++            content.title = "Vừa sao chép"
++            content.body = "Chạm để lưu vào Clip."
+             
+             if let location = ApplicationMonitor.shared.locationManager.location
+             {
 diff --git a/ClipBoard/KeyboardViewController.swift b/ClipBoard/KeyboardViewController.swift
 index ac85035..2d6efeb 100644
 --- a/ClipBoard/KeyboardViewController.swift
@@ -141,26 +158,3 @@ index d9d8da0..31074ea 100644
      }()
      
      @NSManaged var historyLimit: HistoryLimit
-diff --git a/ClipKit/SwiftUI/Keyboard.swift b/ClipKit/SwiftUI/Keyboard.swift
-index ab56325..9824212 100644
---- a/ClipKit/SwiftUI/Keyboard.swift
-+++ b/ClipKit/SwiftUI/Keyboard.swift
-@@ -70,11 +70,14 @@ public struct Keyboard: View
-             }
-             else if self.pasteboardItems.isEmpty
-             {
--                VStack(spacing: 16) {
-+                VStack(spacing: 12) {
-                     Text("No Clippings")
--                        .font(.title)
--                    Text("Items that you've copied to the clipboard will appear here.")
--                        .font(.body)
-+                        .font(.title2)
-+                        .fontWeight(.semibold)
-+                    Text("Items copied will appear here.\n(Tip: Ensure Full Access is ON in Settings > Keyboards)")
-+                        .font(.footnote)
-+                        .multilineTextAlignment(.center)
-+                        .foregroundColor(.secondary)
-                 }
-                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                 .padding()

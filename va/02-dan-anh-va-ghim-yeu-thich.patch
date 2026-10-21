@@ -1,0 +1,414 @@
+diff --git a/Clip/History/HistoryViewController.swift b/Clip/History/HistoryViewController.swift
+index a8d80c6..7402f04 100644
+--- a/Clip/History/HistoryViewController.swift
++++ b/Clip/History/HistoryViewController.swift
+@@ -254,7 +254,8 @@ private extension HistoryViewController
+             
+             if let representation = item.preferredRepresentation
+             {
+-                cell.titleLabel.text = representation.type.localizedName
++                let pinPrefix = item.isPinned ? "📌 " : ""
++                cell.titleLabel.text = pinPrefix + representation.type.localizedName
+                 
+                 switch representation.type
+                 {
+@@ -578,4 +579,26 @@ extension HistoryViewController: UIPopoverPresentationControllerDelegate
+     {
+         return .none
+     }
++
++    override func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration?
++    {
++        let item = self.dataSource.item(at: indexPath)
++        let isPinned = item.isPinned
++        
++        let pinAction = UIContextualAction(style: .normal, title: isPinned ? "Bỏ ghim" : "Ghim") { [weak self] (action, view, completionHandler) in
++            item.isPinned.toggle()
++            self?.tableView.reloadRows(at: [indexPath], with: .automatic)
++            completionHandler(true)
++        }
++        pinAction.backgroundColor = isPinned ? .systemGray : .systemOrange
++        pinAction.image = UIImage(systemName: isPinned ? "pin.slash.fill" : "pin.fill")
++        
++        let deleteAction = UIContextualAction(style: .destructive, title: "Xoá") { (action, view, completionHandler) in
++            item.isMarkedForDeletion = true
++            completionHandler(true)
++        }
++        
++        return UISwipeActionsConfiguration(actions: [deleteAction, pinAction])
++    }
++
+ }
+diff --git a/ClipKit/Database/Model/PasteboardItem.swift b/ClipKit/Database/Model/PasteboardItem.swift
+index b9c00b9..bad6a58 100644
+--- a/ClipKit/Database/Model/PasteboardItem.swift
++++ b/ClipKit/Database/Model/PasteboardItem.swift
+@@ -128,3 +128,35 @@ extension PasteboardItem
+         return pasteboardItem
+     }
+ }
++
++
++public extension PasteboardItem
++{
++    var pinIdentifier: String {
++        if let string = self.preferredRepresentation?.stringValue {
++            return "text:" + string
++        }
++        if let data = self.preferredRepresentation?.data {
++            return "data:\(data.count):\(self.date.timeIntervalSinceReferenceDate)"
++        }
++        return self.objectID.uriRepresentation().absoluteString
++    }
++    
++    var isPinned: Bool {
++        get {
++            let pinned = UserDefaults.shared.stringArray(forKey: "ClipKit.PinnedItems") ?? []
++            return pinned.contains(self.pinIdentifier)
++        }
++        set {
++            var pinned = UserDefaults.shared.stringArray(forKey: "ClipKit.PinnedItems") ?? []
++            if newValue {
++                if !pinned.contains(self.pinIdentifier) {
++                    pinned.append(self.pinIdentifier)
++                }
++            } else {
++                pinned.removeAll { $0 == self.pinIdentifier }
++            }
++            UserDefaults.shared.set(pinned, forKey: "ClipKit.PinnedItems")
++        }
++    }
++}
+diff --git a/ClipKit/SwiftUI/ClippingCell.swift b/ClipKit/SwiftUI/ClippingCell.swift
+index 3b4ec8e..9387859 100644
+--- a/ClipKit/SwiftUI/ClippingCell.swift
++++ b/ClipKit/SwiftUI/ClippingCell.swift
+@@ -24,10 +24,14 @@ private extension Formatter
+ public struct ClippingCell: View
+ {
+     @ObservedObject var pasteboardItem: PasteboardItem
++    var isPinned: Bool
++    var onTogglePin: (() -> Void)?
+     
+-    public init(pasteboardItem: PasteboardItem) 
++    public init(pasteboardItem: PasteboardItem, isPinned: Bool = false, onTogglePin: (() -> Void)? = nil) 
+     {
+         self.pasteboardItem = pasteboardItem
++        self.isPinned = isPinned
++        self.onTogglePin = onTogglePin
+     }
+         
+     public var body: some View {
+@@ -41,6 +45,17 @@ public struct ClippingCell: View
+                         .font(.headline)
+                     
+                     Spacer()
++                    
++                    if let onTogglePin = self.onTogglePin
++                    {
++                        Button(action: onTogglePin) {
++                            Image(systemName: self.isPinned ? "pin.fill" : "pin")
++                                .font(.system(size: 15, weight: .bold))
++                                .foregroundColor(self.isPinned ? .orange : Color(.clipPink).opacity(0.5))
++                                .padding(4)
++                        }
++                        .buttonStyle(BorderlessButtonStyle())
++                    }
+                                             
+                     Text(dateString ?? "")
+                         .font(.caption)
+@@ -53,6 +68,14 @@ public struct ClippingCell: View
+                         .font(.subheadline)
+                         .lineLimit(6)
+                 }
++                else if let uiImage = representation?.imageValue
++                {
++                    Image(uiImage: uiImage)
++                        .resizable()
++                        .scaledToFit()
++                        .frame(maxHeight: 140)
++                        .cornerRadius(6)
++                }
+             }
+             .padding(.horizontal, nil)
+             .padding(.vertical, 8)
+@@ -73,7 +96,7 @@ struct ClippingCell_Previews: PreviewProvider
+         let context = DatabaseManager.shared.persistentContainer.viewContext
+         let date = Date().addingTimeInterval(-1 * 60 * 60)
+         
+-        let item = PasteboardItem.make(item: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum." as NSString, date: date, context: context)
++        let item = PasteboardItem.make(item: "Lorem ipsum dolor sit amet" as NSString, date: date, context: context)
+         
+         return ClippingCell(pasteboardItem: item)
+             .background(Color(.clipPink))
+diff --git a/ClipKit/SwiftUI/Keyboard.swift b/ClipKit/SwiftUI/Keyboard.swift
+index ab56325..cdd197e 100644
+--- a/ClipKit/SwiftUI/Keyboard.swift
++++ b/ClipKit/SwiftUI/Keyboard.swift
+@@ -31,6 +31,9 @@ public struct Keyboard: View
+     @Environment(\.horizontalSizeClass)
+     private var horizontalSizeClass
+     
++    @State private var pinnedItemIDs: [String] = UserDefaults.shared.stringArray(forKey: "ClipKit.PinnedItems") ?? []
++    @State private var showImageCopiedToast: Bool = false
++    
+     public init(inputViewController: UIInputViewController?,
+                 needsInputModeSwitchKey: Bool? = nil,
+                 hasFullAccess: Bool? = nil)
+@@ -39,6 +42,14 @@ public struct Keyboard: View
+         self.needsInputModeSwitchKey = needsInputModeSwitchKey ?? inputViewController?.needsInputModeSwitchKey ?? false
+         self.hasFullAccess = hasFullAccess ?? inputViewController?.hasFullAccess ?? true
+     }
++    
++    private var pinnedItems: [PasteboardItem] {
++        return self.pasteboardItems.filter { self.pinnedItemIDs.contains($0.pinIdentifier) }
++    }
++    
++    private var recentItems: [PasteboardItem] {
++        return self.pasteboardItems.filter { !self.pinnedItemIDs.contains($0.pinIdentifier) }
++    }
+         
+     public var body: some View {
+         ZStack(alignment: .bottomLeading) {
+@@ -70,28 +81,78 @@ public struct Keyboard: View
+             }
+             else if self.pasteboardItems.isEmpty
+             {
+-                VStack(spacing: 16) {
++                VStack(spacing: 12) {
+                     Text("No Clippings")
+-                        .font(.title)
+-                    Text("Items that you've copied to the clipboard will appear here.")
+-                        .font(.body)
++                        .font(.title2)
++                        .fontWeight(.semibold)
++                    Text("Items copied will appear here.\n(Tip: Ensure Full Access is ON in Settings > Keyboards)")
++                        .font(.footnote)
++                        .multilineTextAlignment(.center)
++                        .foregroundColor(.secondary)
+                 }
+                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                 .padding()
+             }
+             else
+             {
+-                let list = List(self.pasteboardItems, id: \.objectID) { (pasteboardItem) in
+-                    Button(action: { self.paste(pasteboardItem) }) {
+-                        ClippingCell(pasteboardItem: pasteboardItem)
++                let list = List {
++                    if !self.pinnedItems.isEmpty {
++                        Section(header:
++                            HStack(spacing: 4) {
++                                Image(systemName: "pin.fill")
++                                    .font(.caption)
++                                    .foregroundColor(.orange)
++                                Text("ĐÃ GHIM")
++                                    .font(.caption)
++                                    .fontWeight(.bold)
++                                    .foregroundColor(.orange)
++                            }
++                            .padding(.horizontal, 4)
++                            .padding(.top, 4)
++                        ) {
++                            ForEach(self.pinnedItems, id: \.objectID) { (pasteboardItem) in
++                                Button(action: { self.paste(pasteboardItem) }) {
++                                    ClippingCell(pasteboardItem: pasteboardItem, isPinned: true, onTogglePin: {
++                                        self.togglePin(pasteboardItem)
++                                    })
++                                }
++                                .buttonStyle(.plain)
++                                .foregroundStyle(.primary)
++                                .listRowBackground(Color.clear)
++                                .listRowSeparator(.hidden)
++                                .listRowInsets(makeInsets())
++                            }
++                        }
++                    }
++                    
++                    Section(header:
++                        HStack(spacing: 4) {
++                            Image(systemName: "clock")
++                                .font(.caption)
++                                .foregroundColor(.secondary)
++                            Text("GẦN ĐÂY")
++                                .font(.caption)
++                                .fontWeight(.bold)
++                                .foregroundColor(.secondary)
++                        }
++                        .padding(.horizontal, 4)
++                        .padding(.top, 4)
++                    ) {
++                        ForEach(self.recentItems, id: \.objectID) { (pasteboardItem) in
++                            Button(action: { self.paste(pasteboardItem) }) {
++                                ClippingCell(pasteboardItem: pasteboardItem, isPinned: false, onTogglePin: {
++                                    self.togglePin(pasteboardItem)
++                                })
++                            }
++                            .buttonStyle(.plain)
++                            .foregroundStyle(.primary)
++                            .listRowBackground(Color.clear)
++                            .listRowSeparator(.hidden)
++                            .listRowInsets(makeInsets())
++                        }
+                     }
+-                    .buttonStyle(.plain)
+-                    .foregroundStyle(.primary)
+-                    .listRowBackground(Color.clear)
+-                    .listRowSeparator(.hidden)
+-                    .listRowInsets(makeInsets())
+                 }
+-                .padding(.top, 8) // iPadOS sometimes places List too close to toolbar, so add padding.
++                .padding(.top, 8)
+                 
+                 if #available(iOS 16.4, *)
+                 {
+@@ -105,6 +166,30 @@ public struct Keyboard: View
+                 }
+             }
+             
++            if self.showImageCopiedToast {
++                VStack {
++                    HStack(spacing: 8) {
++                        Image(systemName: "checkmark.circle.fill")
++                            .foregroundColor(.green)
++                        Text("Đã chép ảnh! Chạm ô chat và chọn \"Dán\"")
++                            .font(.subheadline)
++                            .fontWeight(.semibold)
++                            .foregroundColor(.white)
++                    }
++                    .padding(.horizontal, 16)
++                    .padding(.vertical, 10)
++                    .background(Color.black.opacity(0.85))
++                    .cornerRadius(20)
++                    .shadow(radius: 6)
++                    .padding(.top, 14)
++                    
++                    Spacer()
++                }
++                .frame(maxWidth: .infinity)
++                .transition(.move(edge: .top).combined(with: .opacity))
++                .zIndex(100)
++            }
++            
+             if self.needsInputModeSwitchKey
+             {
+                 let offset = (self.horizontalSizeClass == .regular) ? 16.0 : 8.0
+@@ -123,6 +208,7 @@ public struct Keyboard: View
+         }
+         .edgesIgnoringSafeArea(.all)
+         .onAppear {
++            self.pinnedItemIDs = UserDefaults.shared.stringArray(forKey: "ClipKit.PinnedItems") ?? []
+             UITableView.appearance().backgroundColor = .clear
+             UITableView.appearance().separatorStyle = .none
+             UITableView.appearance().contentInset = UIEdgeInsets(top: 8, left: 0, bottom: 8, right: 0)
+@@ -142,16 +228,52 @@ public struct Keyboard: View
+ 
+ private extension Keyboard
+ {
+-    func paste(_ pasteboardItem: PasteboardItem)
++    func togglePin(_ item: PasteboardItem)
+     {
+-        guard let text = pasteboardItem.preferredRepresentation?.stringValue else { return }
++        var pinned = UserDefaults.shared.stringArray(forKey: "ClipKit.PinnedItems") ?? []
++        let key = item.pinIdentifier
++        if pinned.contains(key) {
++            pinned.removeAll { $0 == key }
++        } else {
++            pinned.append(key)
++        }
++        UserDefaults.shared.set(pinned, forKey: "ClipKit.PinnedItems")
++        self.pinnedItemIDs = pinned
+         
++        let generator = UIImpactFeedbackGenerator(style: .medium)
++        generator.impactOccurred()
++    }
++    
++    func paste(_ pasteboardItem: PasteboardItem)
++    {
+         let center = CFNotificationCenterGetDarwinNotifyCenter()
+         CFNotificationCenterPostNotification(center, .ignoreNextPasteboardChange, nil, nil, true)
+         
+-        UIPasteboard.general.copy(pasteboardItem)
+-        
+-        self.paste(text)
++        if let text = pasteboardItem.preferredRepresentation?.stringValue
++        {
++            UIPasteboard.general.copy(pasteboardItem)
++            self.paste(text)
++        }
++        else if let image = pasteboardItem.preferredRepresentation?.imageValue
++        {
++            UIPasteboard.general.image = image
++            UIPasteboard.general.copy(pasteboardItem)
++            
++            self.inputViewController?.inputView?.playInputClick()
++            let generator = UINotificationFeedbackGenerator()
++            generator.notificationOccurred(.success)
++            
++            withAnimation(.easeInOut(duration: 0.2)) {
++                self.showImageCopiedToast = true
++            }
++            
++            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
++                withAnimation {
++                    self.showImageCopiedToast = false
++                }
++                self.inputViewController?.advanceToNextInputMode()
++            }
++        }
+     }
+     
+     func pasteUUID()
+@@ -172,41 +294,18 @@ private extension Keyboard
+     
+     func openSettings()
+     {
+-        // NSExtensionContext.openURL() can only be called from Today extensions.
+-        // As a workaround, we can just call UIApplication.openURL(),
+-        // but we can't call it directly because it's marked as unavailable for extensions.
+-        guard
+-            let application = (UIApplication.self as AnyObject).value(forKey: "sharedApplication") as? UIApplication
+-        else { return }
+-        
+-        // UIApplication.openSettingsURLString doesn't work from keyboard extension,
+-        // so instead we open Clip which will then open Settings.
+-        let openURL = URL(string: "clip://settings")!
++        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+         
+-        let tempApp = unsafeBitCast(application, to: RSTApplication.self)
+-        tempApp.open(openURL, options: [:], completionHandler: nil)
+-    }
+-}
+-
+-struct Keyboard_Previews: PreviewProvider
+-{
+-    static var previews: some View
+-    {
+-        Preview.prepare()
+-        
+-        let context = DatabaseManager.shared.persistentContainer.viewContext
+-        let date = Date().addingTimeInterval(-1 * 60 * 60)
+-        
+-        _ = PasteboardItem.make(item: "Hello SwiftUI!" as NSString, date: date, context: context)
+-        _ = PasteboardItem.make(item: NSURL(string: "https://rileytestut.com")!, date: date, context: context)
+-        _ = PasteboardItem.make(item: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum." as NSString, date: date, context: context)
+-                
+-        return Group {
+-            Keyboard(inputViewController: nil, needsInputModeSwitchKey: true)
+-            Keyboard(inputViewController: nil, needsInputModeSwitchKey: true, hasFullAccess: false)
++        var responder: UIResponder? = self.inputViewController
++        while responder != nil
++        {
++            if let application = responder as? RSTApplication
++            {
++                application.open(url, options: [:], completionHandler: nil)
++                break
++            }
++            
++            responder = responder?.next
+         }
+-        .background(Color(.lightGray))
+-        .environment(\.managedObjectContext, context)
+-        .previewLayout(.fixed(width: 375, height: 500))
+     }
+ }
