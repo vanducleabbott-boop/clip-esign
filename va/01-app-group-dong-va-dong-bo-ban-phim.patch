@@ -1,0 +1,166 @@
+diff --git a/ClipBoard/KeyboardViewController.swift b/ClipBoard/KeyboardViewController.swift
+index ac85035..2d6efeb 100644
+--- a/ClipBoard/KeyboardViewController.swift
++++ b/ClipBoard/KeyboardViewController.swift
+@@ -64,6 +64,19 @@ class KeyboardViewController: UIInputViewController
+         
+         self.view.setNeedsUpdateConstraints()
+     }
++    
++    override func viewWillAppear(_ animated: Bool)
++    {
++        super.viewWillAppear(animated)
++        
++        guard self.hasFullAccess else { return }
++        
++        if DatabaseManager.shared.isStarted
++        {
++            DatabaseManager.shared.refresh()
++            DatabaseManager.shared.savePasteboard(location: nil) { _ in }
++        }
++    }
+ 
+     override func updateViewConstraints()
+     {
+diff --git a/ClipKit/Database/DatabaseManager.swift b/ClipKit/Database/DatabaseManager.swift
+index a93cce2..62f2e73 100644
+--- a/ClipKit/Database/DatabaseManager.swift
++++ b/ClipKit/Database/DatabaseManager.swift
+@@ -38,14 +38,21 @@ private class PersistentContainer: RSTPersistentContainer
+ {
+     override class func defaultDirectoryURL() -> URL
+     {
+-        guard let appGroup = Bundle.main.appGroups.first else { return super.defaultDirectoryURL() }
+-        
+-        let sharedDirectoryURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)!
++        for appGroup in Bundle.main.appGroups
++        {
++            if let sharedDirectoryURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
++            {
++                let databaseDirectoryURL = sharedDirectoryURL.appendingPathComponent("Database")
++                try? FileManager.default.createDirectory(at: databaseDirectoryURL, withIntermediateDirectories: true, attributes: nil)
++                print("Database URL:", databaseDirectoryURL)
++                return databaseDirectoryURL
++            }
++        }
+         
+-        let databaseDirectoryURL = sharedDirectoryURL.appendingPathComponent("Database")
++        // ESign fallback: khong co App Group hop le -> dung kho rieng cua tien trinh
++        let databaseDirectoryURL = super.defaultDirectoryURL().appendingPathComponent("Database")
+         try? FileManager.default.createDirectory(at: databaseDirectoryURL, withIntermediateDirectories: true, attributes: nil)
+-        
+-        print("Database URL:", databaseDirectoryURL)
++        print("Fallback Database URL:", databaseDirectoryURL)
+         return databaseDirectoryURL
+     }
+ }
+diff --git a/ClipKit/Extensions/Bundle+AppGroups.swift b/ClipKit/Extensions/Bundle+AppGroups.swift
+index dfc85d7..aa8e85f 100644
+--- a/ClipKit/Extensions/Bundle+AppGroups.swift
++++ b/ClipKit/Extensions/Bundle+AppGroups.swift
+@@ -11,7 +11,57 @@ import Foundation
+ public extension Bundle
+ {
+     var appGroups: [String] {
+-        let appGroups = self.object(forInfoDictionaryKey: "ALTAppGroups") as? [String]
+-        return appGroups ?? []
++        var candidates: [String] = []
++        
++        // 1. Doc com.apple.security.application-groups tu embedded.mobileprovision
++        func extractGroups(from url: URL) -> [String] {
++            guard let data = try? Data(contentsOf: url),
++                  let str = String(data: data, encoding: .isoLatin1),
++                  let start = str.range(of: "<?xml"),
++                  let end = str.range(of: "</plist>") else { return [] }
++            let plistStr = String(str[start.lowerBound...end.upperBound])
++            guard let plistData = plistStr.data(using: .utf8),
++                  let plist = try? PropertyListSerialization.propertyList(from: plistData, options: [], format: nil) as? [String: Any],
++                  let entitlements = plist["Entitlements"] as? [String: Any],
++                  let groups = entitlements["com.apple.security.application-groups"] as? [String] else { return [] }
++            return groups
++        }
++        
++        if let provURL = self.url(forResource: "embedded", withExtension: "mobileprovision") {
++            candidates.append(contentsOf: extractGroups(from: provURL))
++        }
++        let parentProvURL = self.bundleURL.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("embedded.mobileprovision")
++        if FileManager.default.fileExists(atPath: parentProvURL.path) {
++            candidates.append(contentsOf: extractGroups(from: parentProvURL))
++        }
++        
++        // 2. Doc ALTAppGroups tu Info.plist
++        if let altGroups = self.object(forInfoDictionaryKey: "ALTAppGroups") as? [String] {
++            candidates.append(contentsOf: altGroups)
++        }
++        
++        // 3. Thu tao group tu bundleIdentifier
++        if let bundleID = self.bundleIdentifier {
++            candidates.append("group.\(bundleID)")
++            let parts = bundleID.split(separator: ".")
++            if parts.count > 2 {
++                let mainID = parts.dropLast().joined(separator: ".")
++                candidates.append("group.\(mainID)")
++            }
++        }
++        
++        // Loc trung lap
++        var unique: [String] = []
++        for c in candidates where !c.isEmpty && !unique.contains(c) {
++            unique.append(c)
++        }
++        
++        // Uu tien nhung group thuc su truy cap duoc (containerURL != nil)
++        let accessible = unique.filter { FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: $0) != nil }
++        if !accessible.isEmpty {
++            return accessible
++        }
++        
++        return unique
+     }
+ }
+diff --git a/ClipKit/Extensions/UserDefaults+App.swift b/ClipKit/Extensions/UserDefaults+App.swift
+index d9d8da0..31074ea 100644
+--- a/ClipKit/Extensions/UserDefaults+App.swift
++++ b/ClipKit/Extensions/UserDefaults+App.swift
+@@ -21,10 +21,14 @@ import Roxas
+ public extension UserDefaults
+ {
+     static let shared: UserDefaults = {
+-        guard let appGroup = Bundle.main.appGroups.first else { return .standard }
+-        
+-        let sharedUserDefaults = UserDefaults(suiteName: appGroup)!
+-        return sharedUserDefaults
++        for appGroup in Bundle.main.appGroups
++        {
++            if let sharedUserDefaults = UserDefaults(suiteName: appGroup)
++            {
++                return sharedUserDefaults
++            }
++        }
++        return .standard
+     }()
+     
+     @NSManaged var historyLimit: HistoryLimit
+diff --git a/ClipKit/SwiftUI/Keyboard.swift b/ClipKit/SwiftUI/Keyboard.swift
+index ab56325..9824212 100644
+--- a/ClipKit/SwiftUI/Keyboard.swift
++++ b/ClipKit/SwiftUI/Keyboard.swift
+@@ -70,11 +70,14 @@ public struct Keyboard: View
+             }
+             else if self.pasteboardItems.isEmpty
+             {
+-                VStack(spacing: 16) {
++                VStack(spacing: 12) {
+                     Text("No Clippings")
+-                        .font(.title)
+-                    Text("Items that you've copied to the clipboard will appear here.")
+-                        .font(.body)
++                        .font(.title2)
++                        .fontWeight(.semibold)
++                    Text("Items copied will appear here.\n(Tip: Ensure Full Access is ON in Settings > Keyboards)")
++                        .font(.footnote)
++                        .multilineTextAlignment(.center)
++                        .foregroundColor(.secondary)
+                 }
+                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                 .padding()
