@@ -1,0 +1,147 @@
+diff --git a/Clip.xcodeproj/project.pbxproj b/Clip.xcodeproj/project.pbxproj
+index 5365ffb..773afe0 100644
+--- a/Clip.xcodeproj/project.pbxproj
++++ b/Clip.xcodeproj/project.pbxproj
+@@ -828,7 +828,7 @@
+ 				CODE_SIGN_STYLE = Automatic;
+ 				DEVELOPMENT_TEAM = 6XVY5G3U44;
+ 				INFOPLIST_FILE = ClipBoard/Info.plist;
+-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
++				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+ 				LD_RUNPATH_SEARCH_PATHS = (
+ 					"$(inherited)",
+ 					"@executable_path/Frameworks",
+@@ -849,7 +849,7 @@
+ 				CODE_SIGN_STYLE = Automatic;
+ 				DEVELOPMENT_TEAM = 6XVY5G3U44;
+ 				INFOPLIST_FILE = ClipBoard/Info.plist;
+-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
++				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+ 				LD_RUNPATH_SEARCH_PATHS = (
+ 					"$(inherited)",
+ 					"@executable_path/Frameworks",
+@@ -870,7 +870,7 @@
+ 				CODE_SIGN_STYLE = Automatic;
+ 				DEVELOPMENT_TEAM = 6XVY5G3U44;
+ 				INFOPLIST_FILE = ClipboardReader/Info.plist;
+-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
++				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+ 				LD_RUNPATH_SEARCH_PATHS = (
+ 					"$(inherited)",
+ 					"@executable_path/Frameworks",
+@@ -891,7 +891,7 @@
+ 				CODE_SIGN_STYLE = Automatic;
+ 				DEVELOPMENT_TEAM = 6XVY5G3U44;
+ 				INFOPLIST_FILE = ClipboardReader/Info.plist;
+-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
++				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+ 				LD_RUNPATH_SEARCH_PATHS = (
+ 					"$(inherited)",
+ 					"@executable_path/Frameworks",
+@@ -1035,7 +1035,7 @@
+ 				CODE_SIGN_STYLE = Automatic;
+ 				DEVELOPMENT_TEAM = 6XVY5G3U44;
+ 				INFOPLIST_FILE = Clip/Info.plist;
+-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
++				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+ 				LD_RUNPATH_SEARCH_PATHS = (
+ 					"$(inherited)",
+ 					"@executable_path/Frameworks",
+@@ -1060,7 +1060,7 @@
+ 				CODE_SIGN_STYLE = Automatic;
+ 				DEVELOPMENT_TEAM = 6XVY5G3U44;
+ 				INFOPLIST_FILE = Clip/Info.plist;
+-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
++				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+ 				LD_RUNPATH_SEARCH_PATHS = (
+ 					"$(inherited)",
+ 					"@executable_path/Frameworks",
+@@ -1088,7 +1088,7 @@
+ 				DYLIB_INSTALL_NAME_BASE = "@rpath";
+ 				INFOPLIST_FILE = ClipKit/Info.plist;
+ 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
++				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+ 				LD_RUNPATH_SEARCH_PATHS = (
+ 					"$(inherited)",
+ 					"@executable_path/Frameworks",
+@@ -1119,7 +1119,7 @@
+ 				DYLIB_INSTALL_NAME_BASE = "@rpath";
+ 				INFOPLIST_FILE = ClipKit/Info.plist;
+ 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
++				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+ 				LD_RUNPATH_SEARCH_PATHS = (
+ 					"$(inherited)",
+ 					"@executable_path/Frameworks",
+diff --git a/Clip/Base.lproj/Main.storyboard b/Clip/Base.lproj/Main.storyboard
+index 86b38a5..2696cf2 100644
+--- a/Clip/Base.lproj/Main.storyboard
++++ b/Clip/Base.lproj/Main.storyboard
+@@ -1,5 +1,5 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="32700.99.1234" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="BHr-Pz-XEL">
++<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="32700.99.1234" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="Z9q-vE-dSj">
+     <device id="retina4_7" orientation="portrait" appearance="light"/>
+     <dependencies>
+         <deployment identifier="iOS"/>
+@@ -7,29 +7,10 @@
+         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+     </dependencies>
+     <scenes>
+-        <!--Tab Bar Controller-->
+-        <scene sceneID="G8a-px-lfx">
+-            <objects>
+-                <tabBarController id="BHr-Pz-XEL" sceneMemberID="viewController">
+-                    <tabBar key="tabBar" contentMode="scaleToFill" insetsLayoutMarginsFromSafeArea="NO" id="wXw-wp-kuj">
+-                        <rect key="frame" x="0.0" y="0.0" width="393" height="49"/>
+-                        <autoresizingMask key="autoresizingMask"/>
+-                        <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+-                    </tabBar>
+-                    <connections>
+-                        <segue destination="Z9q-vE-dSj" kind="relationship" relationship="viewControllers" id="PoF-Yv-BIK"/>
+-                        <segue destination="kpG-iJ-80X" kind="relationship" relationship="viewControllers" id="AMM-Dn-Cgz"/>
+-                    </connections>
+-                </tabBarController>
+-                <placeholder placeholderIdentifier="IBFirstResponder" id="MAl-QG-WpX" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+-            </objects>
+-            <point key="canvasLocation" x="866" y="466"/>
+-        </scene>
+         <!--List-->
+         <scene sceneID="u6D-9E-L2J">
+             <objects>
+                 <navigationController automaticallyAdjustsScrollViewInsets="NO" id="Z9q-vE-dSj" customClass="ForwardingNavigationController" customModule="Clip" customModuleProvider="target" sceneMemberID="viewController">
+-                    <tabBarItem key="tabBarItem" title="List" id="PKr-yJ-H3B"/>
+                     <toolbarItems/>
+                     <navigationBar key="navigationBar" contentMode="scaleToFill" insetsLayoutMarginsFromSafeArea="NO" barStyle="black" translucent="NO" largeTitles="YES" id="mZf-DU-Jdd">
+                         <rect key="frame" x="0.0" y="20" width="375" height="96"/>
+@@ -73,17 +54,6 @@
+             </objects>
+             <point key="canvasLocation" x="2684" y="115.59220389805098"/>
+         </scene>
+-        <!--Map-->
+-        <scene sceneID="8yd-00-beM">
+-            <objects>
+-                <hostingController id="kpG-iJ-80X" customClass="ClippingsMapViewController" customModule="Clip" customModuleProvider="target" sceneMemberID="viewController">
+-                    <tabBarItem key="tabBarItem" title="Map" id="zZh-lg-wou"/>
+-                    <navigationItem key="navigationItem" id="JSY-Sx-Vfe"/>
+-                </hostingController>
+-                <placeholder placeholderIdentifier="IBFirstResponder" id="1yu-Vg-29s" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+-            </objects>
+-            <point key="canvasLocation" x="1889" y="841"/>
+-        </scene>
+         <!--Settings-->
+         <scene sceneID="eeF-sn-zd0">
+             <objects>
+diff --git a/Clip/Clip.entitlements b/Clip/Clip.entitlements
+index 2550a61..0bc2c50 100644
+--- a/Clip/Clip.entitlements
++++ b/Clip/Clip.entitlements
+@@ -6,7 +6,5 @@
+ 	<array>
+ 		<string>group.com.rileytestut.Clip</string>
+ 	</array>
+-	<key>inter-app-audio</key>
+-	<true/>
+ </dict>
+ </plist>

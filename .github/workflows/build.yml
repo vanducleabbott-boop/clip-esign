@@ -1,8 +1,6 @@
-name: Build Clip IPA (cho ESign)
-# Lấy mã nguồn gốc rileytestut/Clip (Unlicense) + submodule Roxas, build KHÔNG ký, đóng IPA để ESign ký lại.
-# Phiên bản: file PHIEN_BAN = "<MARKETING_VERSION> <CURRENT_PROJECT_VERSION>" (vd "1.3 2") - sửa/thêm tính năng
-# thì NÂNG số này; IPA ra tên Clip_v<ver>.ipa. Bản gốc của Riley = 1.2.
-# Bản vá riêng (nếu có): mọi file *.patch trong thư mục vá/ được áp lên mã nguồn gốc theo thứ tự tên.
+name: Build Clip IPA (cho ESign & TrollStore)
+# Lấy mã nguồn gốc rileytestut/Clip (Unlicense) + submodule Roxas, áp các bản vá trong va/*.patch,
+# build và ký ad-hoc (kèm ldid và entitlements đầy đủ) để tương thích cả TrollStore lẫn ESign.
 on:
   workflow_dispatch:
   push:
@@ -30,7 +28,11 @@ jobs:
           shopt -s nullglob
           for p in ../rieng/va/*.patch; do echo "== áp $p"; git apply --whitespace=nowarn "$p"; done
 
-      - name: Build (không ký)
+      - name: Cài đặt công cụ ký
+        run: |
+          brew install ldid
+
+      - name: Build ứng dụng
         working-directory: clip
         run: |
           set -o pipefail
@@ -44,10 +46,46 @@ jobs:
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             build | tail -n 80
 
-      - name: Đóng gói IPA
+      - name: Ký ad-hoc & đóng gói IPA (TrollStore & ESign)
         working-directory: clip
         run: |
           APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -n 1)
+          echo "Tìm thấy app tại: $APP"
+
+          # 1. Ký các dynamic frameworks
+          for f in "$APP"/Frameworks/*.framework; do
+            [ -d "$f" ] || continue
+            name=$(basename "$f" .framework)
+            if [ -f "$f/$name" ]; then
+              echo "== Ký framework: $name"
+              ldid -S "$f/$name" || true
+              codesign -s - -f --preserve-metadata=identifier,flags,runtime "$f"
+            fi
+          done
+
+          # 2. Ký App Extensions kèm entitlements
+          if [ -d "$APP/PlugIns/ClipBoard.appex" ]; then
+            echo "== Ký ClipBoard.appex"
+            ldid -SClipBoard/ClipBoard.entitlements "$APP/PlugIns/ClipBoard.appex/ClipBoard" || true
+            codesign -s - -f --entitlements ClipBoard/ClipBoard.entitlements --preserve-metadata=identifier,flags,runtime "$APP/PlugIns/ClipBoard.appex"
+          fi
+
+          if [ -d "$APP/PlugIns/ClipboardReader.appex" ]; then
+            echo "== Ký ClipboardReader.appex"
+            ldid -SClipboardReader/ClipboardReader.entitlements "$APP/PlugIns/ClipboardReader.appex/ClipboardReader" || true
+            codesign -s - -f --entitlements ClipboardReader/ClipboardReader.entitlements --preserve-metadata=identifier,flags,runtime "$APP/PlugIns/ClipboardReader.appex"
+          fi
+
+          # 3. Ký main app binary kèm Clip.entitlements
+          echo "== Ký Clip.app"
+          ldid -SClip/Clip.entitlements "$APP/Clip" || true
+          codesign -s - -f --entitlements Clip/Clip.entitlements --preserve-metadata=identifier,flags,runtime "$APP"
+
+          # 4. Kiểm tra chữ ký và entitlements
+          echo "== Kiểm tra entitlements đã nhúng vào binary:"
+          ldid -e "$APP/Clip" || true
+
+          # 5. Đóng gói IPA
           mkdir -p Payload
           cp -R "$APP" Payload/
           zip -qry "../Clip_v$VER.ipa" Payload

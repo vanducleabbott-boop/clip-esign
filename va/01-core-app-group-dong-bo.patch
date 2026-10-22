@@ -1,15 +1,29 @@
 diff --git a/Clip/Pasteboard/PasteboardMonitor.swift b/Clip/Pasteboard/PasteboardMonitor.swift
-index 660944e..35cc09c 100644
+index 660944e..c6aaca3 100644
 --- a/Clip/Pasteboard/PasteboardMonitor.swift
 +++ b/Clip/Pasteboard/PasteboardMonitor.swift
-@@ -88,8 +88,10 @@ private extension PasteboardMonitor
+@@ -57,8 +57,12 @@ private extension PasteboardMonitor
+         
+         let className = ["Connection", "Server", "PB"].reversed().joined()
+         
+-        let PBServerConnection = NSClassFromString(className) as AnyObject
+-        _ = PBServerConnection.perform(NSSelectorFromString(beginListeningSelector))
++        if let connectionClass = NSClassFromString(className) as AnyObject? {
++            let selector = NSSelectorFromString(beginListeningSelector)
++            if connectionClass.responds(to: selector) {
++                _ = connectionClass.perform(selector)
++            }
++        }
+         #endif
+         
+         let changedNotification = ["changed", "pasteboard", "apple", "com"].reversed().joined(separator: ".")
+@@ -88,8 +92,9 @@ private extension PasteboardMonitor
              
              let content = UNMutableNotificationContent()
              content.categoryIdentifier = UNNotificationCategory.clipboardReaderIdentifier
 -            content.title = NSLocalizedString("Clipboard Changed", comment: "")
 -            content.body = NSLocalizedString("Swipe down to save to Clip.", comment: "")
-+            // ESign không có App Group: kéo thông báo xuống sẽ lưu vào kho riêng của phần mở rộng (app không thấy)
-+            // -> hướng dẫn CHẠM để mở Clip, Clip tự lưu clipboard khi mở (sceneWillEnterForeground).
++            // ESign / TrollStore: chạm để mở Clip, Clip tự lưu clipboard khi mở (sceneWillEnterForeground).
 +            content.title = "Vừa sao chép"
 +            content.body = "Chạm để lưu vào Clip."
              
@@ -40,7 +54,7 @@ index ac85035..2d6efeb 100644
      override func updateViewConstraints()
      {
 diff --git a/ClipKit/Database/DatabaseManager.swift b/ClipKit/Database/DatabaseManager.swift
-index a93cce2..62f2e73 100644
+index a93cce2..56fef13 100644
 --- a/ClipKit/Database/DatabaseManager.swift
 +++ b/ClipKit/Database/DatabaseManager.swift
 @@ -38,14 +38,21 @@ private class PersistentContainer: RSTPersistentContainer
@@ -62,7 +76,7 @@ index a93cce2..62f2e73 100644
 +        }
          
 -        let databaseDirectoryURL = sharedDirectoryURL.appendingPathComponent("Database")
-+        // ESign fallback: khong co App Group hop le -> dung kho rieng cua tien trinh
++        // ESign / TrollStore fallback: khong co App Group hop le -> dung kho rieng cua tien trinh
 +        let databaseDirectoryURL = super.defaultDirectoryURL().appendingPathComponent("Database")
          try? FileManager.default.createDirectory(at: databaseDirectoryURL, withIntermediateDirectories: true, attributes: nil)
 -        
@@ -72,10 +86,10 @@ index a93cce2..62f2e73 100644
      }
  }
 diff --git a/ClipKit/Extensions/Bundle+AppGroups.swift b/ClipKit/Extensions/Bundle+AppGroups.swift
-index dfc85d7..aa8e85f 100644
+index dfc85d7..add557c 100644
 --- a/ClipKit/Extensions/Bundle+AppGroups.swift
 +++ b/ClipKit/Extensions/Bundle+AppGroups.swift
-@@ -11,7 +11,57 @@ import Foundation
+@@ -11,7 +11,59 @@ import Foundation
  public extension Bundle
  {
      var appGroups: [String] {
@@ -83,7 +97,7 @@ index dfc85d7..aa8e85f 100644
 -        return appGroups ?? []
 +        var candidates: [String] = []
 +        
-+        // 1. Doc com.apple.security.application-groups tu embedded.mobileprovision
++        // 1. Doc com.apple.security.application-groups tu embedded.mobileprovision (neu co)
 +        func extractGroups(from url: URL) -> [String] {
 +            guard let data = try? Data(contentsOf: url),
 +                  let str = String(data: data, encoding: .isoLatin1),
@@ -132,7 +146,9 @@ index dfc85d7..aa8e85f 100644
 +            return accessible
 +        }
 +        
-+        return unique
++        // Neu khong co group nao truy cap duoc (TrollStore khong group hoac ESign khong cert group):
++        // tra ve mang rong de UserDefaults.shared va Core Data dung kho mac dinh an toan, khong crash.
++        return []
      }
  }
 diff --git a/ClipKit/Extensions/UserDefaults+App.swift b/ClipKit/Extensions/UserDefaults+App.swift
